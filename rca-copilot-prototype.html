@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCA Copilot — Investigation Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #12181F;
+    --panel: #1B232C;
+    --panel-raised: #212B35;
+    --line: #2C3742;
+    --text: #E7ECF0;
+    --text-dim: #8A97A3;
+    --text-faint: #5C6873;
+    --steel: #5B8AA6;
+    --amber: #E0A33D;
+    --amber-dim: #4A3A20;
+    --teal: #4FA391;
+    --red: #D2604F;
+    --red-dim: #4A2A24;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    padding: 28px 20px 60px;
+  }
+  .mono{ font-family: 'IBM Plex Mono', monospace; }
+  .wrap{ max-width: 1180px; margin: 0 auto; }
+
+  /* HEADER */
+  header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 18px; margin-bottom: 22px;
+    flex-wrap: wrap; gap: 14px;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{
+    width: 30px; height: 30px; border: 1.5px solid var(--steel);
+    display:flex; align-items:center; justify-content:center;
+    color: var(--steel); font-size: 13px; font-weight:600;
+    font-family:'IBM Plex Mono',monospace;
+    flex-shrink:0;
+  }
+  .brand-text h1{ font-size: 17px; font-weight: 600; letter-spacing: 0.2px; }
+  .brand-text p{ font-size: 12px; color: var(--text-dim); margin-top: 1px; font-family:'IBM Plex Mono',monospace; }
+  .case-id{ text-align:right; font-family:'IBM Plex Mono',monospace; font-size: 12px; color: var(--text-dim); }
+  .case-id .id{ color: var(--amber); font-size: 13px; }
+
+  /* SCENARIO BAR */
+  .scenario{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    display:flex; justify-content:space-between; align-items:center;
+    gap: 20px; flex-wrap: wrap;
+  }
+  .scenario p{ font-size: 14px; color: var(--text-dim); line-height:1.55; max-width: 640px; }
+  .scenario strong{ color: var(--text); font-weight: 500; }
+  button.run{
+    background: var(--amber);
+    color: #1A1305;
+    border: none;
+    padding: 12px 22px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  button.run:hover{ background: #EEB456; }
+  button.run:active{ transform: scale(0.98); }
+  button.run:disabled{ background: var(--line); color: var(--text-faint); cursor: default; }
+
+  /* SOURCE STRIP */
+  .sources{
+    display:grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 22px;
+  }
+  .source-card{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .source-card .label{ font-size: 11px; color: var(--text-faint); font-family:'IBM Plex Mono',monospace; letter-spacing:0.3px; }
+  .source-card .value{ font-size: 15px; margin-top: 6px; font-weight: 500; }
+  .source-card .sub{ font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+  .source-card .dot{
+    position:absolute; top:14px; right:14px;
+    width:7px; height:7px; border-radius:50%;
+    background: var(--text-faint);
+  }
+  .source-card.scanning .dot{ background: var(--amber); animation: pulse 1s infinite; }
+  .source-card.done .dot{ background: var(--teal); }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+  /* MAIN GRID */
+  .grid{ display:grid; grid-template-columns: 1.6fr 1fr; gap: 20px; }
+  @media (max-width: 860px){ .grid{ grid-template-columns: 1fr; } .sources{ grid-template-columns: repeat(2,1fr); } }
+
+  .panel{ background: var(--panel); border: 1px solid var(--line); }
+  .panel-head{
+    padding: 14px 18px; border-bottom: 1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .panel-head h2{ font-size: 13px; font-weight: 600; letter-spacing:0.3px; }
+  .panel-head .count{ font-family:'IBM Plex Mono',monospace; font-size: 11px; color: var(--text-faint); }
+  .panel-body{ padding: 18px; }
+
+  .empty-state{
+    padding: 50px 20px; text-align:center; color: var(--text-faint);
+    font-size: 13px; font-family:'IBM Plex Mono',monospace; line-height: 1.7;
+  }
+
+  /* CAUSE CARDS */
+  .cause{
+    border: 1px solid var(--line);
+    margin-bottom: 14px;
+    background: var(--panel-raised);
+  }
+  .cause:last-child{ margin-bottom: 0; }
+  .cause-top{ display:flex; padding: 16px 18px 12px; gap: 14px; align-items:flex-start; }
+  .rank{
+    font-family:'IBM Plex Mono',monospace; font-size: 20px; font-weight: 600;
+    color: var(--text-faint); width: 26px; flex-shrink:0; line-height:1;
+    padding-top: 2px;
+  }
+  .cause.top1 .rank{ color: var(--amber); }
+  .cause-main{ flex:1; }
+  .cause-main h3{ font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .cause-main .desc{ font-size: 13px; color: var(--text-dim); line-height: 1.55; }
+  .confidence{ text-align:right; flex-shrink:0; }
+  .confidence .pct{ font-family:'IBM Plex Mono',monospace; font-size: 20px; font-weight: 600; }
+  .cause.top1 .confidence .pct{ color: var(--amber); }
+  .confidence .cap{ font-size: 10px; color: var(--text-faint); text-transform: lowercase; margin-top:2px; }
+  .bar-track{ height: 3px; background: var(--line); margin: 0 18px 14px; }
+  .bar-fill{ height: 100%; background: var(--text-faint); width:0%; transition: width 1s ease; }
+  .cause.top1 .bar-fill{ background: var(--amber); }
+  .cause.top2 .bar-fill{ background: var(--steel); }
+
+  .evidence-list{ padding: 0 18px 16px; display:flex; flex-direction:column; gap: 7px; }
+  .evidence-item{
+    font-size: 12.5px; color: var(--text-dim); font-family:'IBM Plex Mono',monospace;
+    padding-left: 14px; position:relative; line-height: 1.5;
+  }
+  .evidence-item::before{
+    content:'›'; position:absolute; left:0; color: var(--steel);
+  }
+  .evidence-item b{ color: var(--text); font-weight:500; }
+
+  .action-row{
+    border-top: 1px solid var(--line);
+    padding: 12px 18px;
+    font-size: 12.5px; color: var(--teal);
+    display:flex; gap: 8px; align-items:flex-start;
+  }
+  .action-row .tag{
+    font-family:'IBM Plex Mono',monospace; font-size: 10px; color: var(--teal);
+    border: 1px solid var(--teal); padding: 1px 6px; flex-shrink:0; margin-top:1px;
+  }
+
+  /* RIGHT COLUMN */
+  .side-block{ margin-bottom: 20px; }
+  .side-block:last-child{ margin-bottom: 0; }
+
+  .metric-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 11px 0; border-bottom: 1px solid var(--line);
+  }
+  .metric-row:last-child{ border-bottom: none; }
+  .metric-row .m-label{ font-size: 12.5px; color: var(--text-dim); }
+  .metric-row .m-value{ font-family:'IBM Plex Mono',monospace; font-size: 14px; font-weight: 500; }
+  .metric-row .m-value.good{ color: var(--teal); }
+  .metric-row .m-value.warn{ color: var(--amber); }
+
+  .timeline{ display:flex; flex-direction:column; gap: 0; }
+  .t-item{ display:flex; gap: 12px; padding: 10px 0; border-bottom:1px solid var(--line); }
+  .t-item:last-child{ border-bottom:none; }
+  .t-dot{ width:6px; height:6px; border-radius:50%; background: var(--text-faint); margin-top:6px; flex-shrink:0; }
+  .t-dot.flag{ background: var(--red); }
+  .t-text{ font-size: 12.5px; color: var(--text-dim); line-height:1.5; }
+  .t-text .t-date{ color: var(--text-faint); font-family:'IBM Plex Mono',monospace; font-size:11px; display:block; margin-bottom:2px; }
+
+  footer{
+    max-width: 1180px; margin: 30px auto 0; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 11.5px; color: var(--text-faint); font-family:'IBM Plex Mono',monospace;
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">RC</div>
+      <div class="brand-text">
+        <h1>RCA Copilot</h1>
+        <p>AI-powered root cause analysis · manufacturing</p>
+      </div>
+    </div>
+    <div class="case-id">
+      CASE <span class="id" id="caseId">#INV-20260915-041</span><br>
+      Line 3 · CNC Cell 07
+    </div>
+  </header>
+
+  <div class="scenario">
+    <p><strong>Prototype scenario:</strong> Machined bracket (Part #BR-2281) failed dimensional inspection — bore diameter measured 0.014mm over tolerance. Run the analysis to correlate CNC parameters, machine condition, maintenance history and prior cases.</p>
+    <button class="run" id="runBtn" onclick="runAnalysis()">Run Investigation</button>
+  </div>
+
+  <div class="sources" id="sources">
+    <div class="source-card" data-src="cnc">
+      <div class="dot"></div>
+      <div class="label">SOURCE 01</div>
+      <div class="value">CNC Parameters</div>
+      <div class="sub">Idle</div>
+    </div>
+    <div class="source-card" data-src="machine">
+      <div class="dot"></div>
+      <div class="label">SOURCE 02</div>
+      <div class="value">Machine Condition</div>
+      <div class="sub">Idle</div>
+    </div>
+    <div class="source-card" data-src="maint">
+      <div class="dot"></div>
+      <div class="label">SOURCE 03</div>
+      <div class="value">Maintenance History</div>
+      <div class="sub">Idle</div>
+    </div>
+    <div class="source-card" data-src="prior">
+      <div class="dot"></div>
+      <div class="label">SOURCE 04</div>
+      <div class="value">Prior Cases</div>
+      <div class="sub">Idle</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>RANKED ROOT CAUSES</h2>
+        <span class="count" id="causeCount">— results</span>
+      </div>
+      <div class="panel-body" id="causesBody">
+        <div class="empty-state">No investigation run yet.<br>Click "Run Investigation" to correlate data sources and generate ranked root causes.</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel side-block">
+        <div class="panel-head"><h2>INVESTIGATION METRICS</h2></div>
+        <div class="panel-body" id="metricsBody">
+          <div class="metric-row"><span class="m-label">Time to insight</span><span class="m-value" id="mTime">—</span></div>
+          <div class="metric-row"><span class="m-label">Sources correlated</span><span class="m-value" id="mSources">0 / 4</span></div>
+          <div class="metric-row"><span class="m-label">Diagnostic confidence</span><span class="m-value" id="mConf">—</span></div>
+          <div class="metric-row"><span class="m-label">Similar prior cases</span><span class="m-value" id="mPrior">—</span></div>
+          <div class="metric-row"><span class="m-label">Est. first-pass yield gain</span><span class="m-value" id="mYield">—</span></div>
+        </div>
+      </div>
+
+      <div class="panel side-block">
+        <div class="panel-head"><h2>EVIDENCE TIMELINE</h2></div>
+        <div class="panel-body">
+          <div class="timeline" id="timelineBody">
+            <div class="t-item"><div class="t-dot"></div><div class="t-text">Run the investigation to populate the machine event timeline.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Success signals tracked: investigation speed · diagnostic precision · recurrence prevention · first-pass yield</span>
+    <span id="statusLine">STATUS: AWAITING INPUT</span>
+  </footer>
+
+</div>
+
+<script>
+const causes = [
+  {
+    rank: 1, conf: 78, title: "Tool wear exceeding replacement threshold",
+    desc: "Boring tool T-14 was 340 cycles past its recommended replacement interval, consistent with gradual bore diameter drift.",
+    evidence: [
+      "CNC log: <b>feed rate stable</b>, but spindle load rose 6.2% over last 340 parts on T-14",
+      "Maintenance record: T-14 last replaced <b>412 cycles ago</b> — 340-cycle interval was recommended",
+      "Prior case INV-20260212: identical tool-wear signature preceded a bore tolerance failure"
+    ],
+    action: { tag: "IMMEDIATE", text: "Replace boring tool T-14 and re-run first-article inspection on next 5 parts before resuming line." }
+  },
+  {
+    rank: 2, conf: 61, title: "Thermal drift from extended cell runtime",
+    desc: "CNC Cell 07 ran 7.4 continuous hours without a cooldown cycle, which can shift spindle alignment by a few microns.",
+    evidence: [
+      "Machine condition log: spindle housing temp reached <b>52°C</b>, 9°C above baseline",
+      "No scheduled cooldown logged between shift start and failure timestamp",
+      "Similar deviation seen in 2 of 6 comparable historical bore-tolerance failures"
+    ],
+    action: { tag: "MONITOR", text: "Add a mid-shift cooldown checkpoint for Cell 07 during extended runs; log spindle temp at 4-hour intervals." }
+  },
+  {
+    rank: 3, conf: 34, title: "Fixture clamping pressure variance",
+    desc: "Clamping pressure on fixture F-09 showed minor inconsistency across the last inspection batch, a lower-probability contributor.",
+    evidence: [
+      "Process data: clamping pressure varied ±3.1% across batch, within spec but above typical variance",
+      "No matching maintenance flag on fixture F-09 in the last 90 days"
+    ],
+    action: { tag: "LOW PRIORITY", text: "Schedule a routine fixture calibration check during next planned maintenance window." }
+  }
+];
+
+const timelineEvents = [
+  { date: "SEP 15, 06:02", text: "Shift start — Cell 07 begins continuous run, tool T-14 in service.", flag:false },
+  { date: "SEP 15, 10:40", text: "Spindle load trend begins drifting upward (+2.1%) — below alert threshold, not flagged in real time.", flag:false },
+  { date: "SEP 15, 11:55", text: "Spindle housing temp crosses 48°C, no scheduled cooldown triggered.", flag:false },
+  { date: "SEP 15, 13:22", text: "Part BR-2281 fails dimensional inspection — bore diameter +0.014mm over tolerance.", flag:true }
+];
+
+let running = false;
+
+function runAnalysis(){
+  if(running) return;
+  running = true;
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = "Analyzing...";
+  document.getElementById('statusLine').textContent = "STATUS: CORRELATING SOURCES";
+  document.getElementById('causesBody').innerHTML = '<div class="empty-state">Correlating multi-source data…</div>';
+
+  const cards = document.querySelectorAll('.source-card');
+  const subs = { cnc: "142 parameters scanned", machine: "Condition logs pulled", maint: "18-month history loaded", prior: "6 similar cases matched" };
+  const order = ['cnc','machine','maint','prior'];
+  let i = 0;
+  let sourcesDone = 0;
+
+  function stepSource(){
+    if(i > 0){
+      const prev = document.querySelector('.source-card[data-src="'+order[i-1]+'"]');
+      prev.classList.remove('scanning');
+      prev.classList.add('done');
+      prev.querySelector('.sub').textContent = subs[order[i-1]];
+      sourcesDone++;
+      document.getElementById('mSources').textContent = sourcesDone + " / 4";
+    }
+    if(i < order.length){
+      const cur = document.querySelector('.source-card[data-src="'+order[i]+'"]');
+      cur.classList.add('scanning');
+      cur.querySelector('.sub').textContent = "Scanning…";
+      i++;
+      setTimeout(stepSource, 550);
+    } else {
+      setTimeout(renderResults, 400);
+    }
+  }
+  stepSource();
+}
+
+function renderResults(){
+  document.getElementById('statusLine').textContent = "STATUS: INVESTIGATION COMPLETE";
+  document.getElementById('mTime').textContent = "3.2s";
+  document.getElementById('mTime').classList.add('good');
+  document.getElementById('mConf').textContent = "High (78%)";
+  document.getElementById('mConf').classList.add('good');
+  document.getElementById('mPrior').textContent = "6 matched";
+  document.getElementById('mYield').textContent = "+2.1% est.";
+  document.getElementById('mYield').classList.add('warn');
+  document.getElementById('caseCount') && null;
+  document.getElementById('causeCount').textContent = causes.length + " candidates ranked";
+
+  let html = '';
+  causes.forEach(c => {
+    const topClass = c.rank === 1 ? 'top1' : c.rank === 2 ? 'top2' : 'top3';
+    html += `
+      <div class="cause ${topClass}">
+        <div class="cause-top">
+          <div class="rank">0${c.rank}</div>
+          <div class="cause-main">
+            <h3>${c.title}</h3>
+            <div class="desc">${c.desc}</div>
+          </div>
+          <div class="confidence">
+            <div class="pct">${c.conf}%</div>
+            <div class="cap">confidence</div>
+          </div>
+        </div>
+        <div class="bar-track"><div class="bar-fill" data-width="${c.conf}"></div></div>
+        <div class="evidence-list">
+          ${c.evidence.map(e => `<div class="evidence-item">${e}</div>`).join('')}
+        </div>
+        <div class="action-row"><span class="tag">${c.action.tag}</span><span>${c.action.text}</span></div>
+      </div>
+    `;
+  });
+  document.getElementById('causesBody').innerHTML = html;
+
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.bar-fill').forEach(b=>{
+      b.style.width = b.dataset.width + '%';
+    });
+  });
+
+  let tHtml = '';
+  timelineEvents.forEach(t=>{
+    tHtml += `<div class="t-item"><div class="t-dot ${t.flag ? 'flag' : ''}"></div><div class="t-text"><span class="t-date">${t.date}</span>${t.text}</div></div>`;
+  });
+  document.getElementById('timelineBody').innerHTML = tHtml;
+
+  const btn = document.getElementById('runBtn');
+  btn.textContent = "Re-run Investigation";
+  btn.disabled = false;
+  running = false;
+}
+</script>
+</body>
+</html>
